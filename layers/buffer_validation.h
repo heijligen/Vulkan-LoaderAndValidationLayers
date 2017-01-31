@@ -82,6 +82,11 @@ bool FindGlobalLayout(core_validation::layer_data *device_data, ImageSubresource
 
 bool FindLayouts(core_validation::layer_data *device_data, VkImage image, std::vector<VkImageLayout> &layouts);
 
+bool FindLayout(const std::unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap, ImageSubresourcePair imgpair, VkImageLayout &layout,
+                const VkImageAspectFlags aspectMask);
+
+bool FindLayout(const std::unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap, ImageSubresourcePair imgpair, VkImageLayout &layout);
+
 void SetGlobalLayout(core_validation::layer_data *device_data, ImageSubresourcePair imgpair, const VkImageLayout &layout);
 
 void SetLayout(core_validation::layer_data *device_data, GLOBAL_CB_NODE *pCB, ImageSubresourcePair imgpair,
@@ -89,6 +94,8 @@ void SetLayout(core_validation::layer_data *device_data, GLOBAL_CB_NODE *pCB, Im
 
 void SetLayout(core_validation::layer_data *device_data, GLOBAL_CB_NODE *pCB, ImageSubresourcePair imgpair,
                const VkImageLayout &layout);
+
+void SetLayout(std::unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap, ImageSubresourcePair imgpair, VkImageLayout layout);
 
 void SetImageViewLayout(core_validation::layer_data *device_data, GLOBAL_CB_NODE *pCB, VkImageView imageView,
                         const VkImageLayout &layout);

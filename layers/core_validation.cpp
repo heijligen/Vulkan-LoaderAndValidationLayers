@@ -4114,11 +4114,12 @@ static bool ValidateStageMaskGsTsEnables(layer_data *dev_data, VkPipelineStageFl
 // This validates that the initial layout specified in the command buffer for
 // the IMAGE is the same
 // as the global IMAGE layout
-static bool ValidateCmdBufImageLayouts(layer_data *dev_data, GLOBAL_CB_NODE *pCB) {
+static bool ValidateCmdBufImageLayouts(layer_data *dev_data, GLOBAL_CB_NODE *pCB, unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap) {
     bool skip_call = false;
     for (auto cb_image_data : pCB->imageLayoutMap) {
         VkImageLayout imageLayout;
-        if (!FindGlobalLayout(dev_data, cb_image_data.first, imageLayout)) {
+
+        if (!FindLayout(imageLayoutMap, cb_image_data.first, imageLayout)) {
             skip_call |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT,
                                  VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT, 0, __LINE__, DRAWSTATE_INVALID_IMAGE_LAYOUT, "DS",
                                  "Cannot submit cmd buffer using deleted image 0x%" PRIx64 ".",
@@ -4148,10 +4149,18 @@ static bool ValidateCmdBufImageLayouts(layer_data *dev_data, GLOBAL_CB_NODE *pCB
                                 string_VkImageLayout(cb_image_data.second.initialLayout));
                 }
             }
-            SetGlobalLayout(dev_data, cb_image_data.first, cb_image_data.second.layout);
+            SetLayout(imageLayoutMap, cb_image_data.first, cb_image_data.second.layout);
         }
     }
     return skip_call;
+}
+
+static void UpdateCmdBufImageLayouts(layer_data *dev_data, GLOBAL_CB_NODE *pCB) {
+    for (auto cb_image_data : pCB->imageLayoutMap) {
+        VkImageLayout imageLayout;
+        FindGlobalLayout(dev_data, cb_image_data.first, imageLayout);
+        SetGlobalLayout(dev_data, cb_image_data.first, cb_image_data.second.layout);
+    }
 }
 
 // Loop through bound objects and increment their in_use counts if increment parameter is true
@@ -4605,6 +4614,7 @@ static void PostCallRecordQueueSubmit(layer_data *dev_data, VkQueue queue, uint3
         for (uint32_t i = 0; i < submit->commandBufferCount; i++) {
             auto cb_node = getCBNode(dev_data, submit->pCommandBuffers[i]);
             if (cb_node) {
+                UpdateCmdBufImageLayouts(dev_data, cb_node);
                 incrementResources(dev_data, cb_node);
                 if (!cb_node->secondaryCommandBuffers.empty()) {
                     for (auto secondaryCmdBuffer : cb_node->secondaryCommandBuffers) {
@@ -4638,6 +4648,7 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
     unordered_set<VkSemaphore> signaled_semaphores;
     unordered_set<VkSemaphore> unsignaled_semaphores;
     unordered_set<VkCommandBuffer> current_cmds;
+    unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> localImageLayoutMap = dev_data->imageLayoutMap;
     // Now verify each individual submit
     for (uint32_t submit_idx = 0; submit_idx < submitCount; submit_idx++) {
         const VkSubmitInfo *submit = &pSubmits[submit_idx];
@@ -4681,7 +4692,7 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
         }
         for (uint32_t i = 0; i < submit->commandBufferCount; i++) {
             auto cb_node = getCBNode(dev_data, submit->pCommandBuffers[i]);
-            skip_call |= ValidateCmdBufImageLayouts(dev_data, cb_node);
+            skip_call |= ValidateCmdBufImageLayouts(dev_data, cb_node, localImageLayoutMap);
             if (cb_node) {
                 cbs->push_back(submit->pCommandBuffers[i]);
                 for (auto secondaryCmdBuffer : cb_node->secondaryCommandBuffers) {

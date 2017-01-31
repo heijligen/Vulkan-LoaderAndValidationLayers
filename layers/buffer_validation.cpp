@@ -64,6 +64,11 @@ void SetLayout(core_validation::layer_data *device_data, OBJECT *pObject, ImageS
     }
 }
 
+// Set the layout in supplied map
+void SetLayout(std::unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap, ImageSubresourcePair imgpair, VkImageLayout layout) {
+    imageLayoutMap[imgpair].layout = layout;
+}
+
 bool FindLayoutVerifyNode(core_validation::layer_data *device_data, GLOBAL_CB_NODE *pCB, ImageSubresourcePair imgpair,
                           IMAGE_CMD_BUF_LAYOUT_NODE &node, const VkImageAspectFlags aspectMask) {
     const debug_report_data *report_data = core_validation::GetReportData(device_data);
@@ -170,6 +175,35 @@ bool FindLayouts(core_validation::layer_data *device_data, VkImage image, std::v
         if (img_data != (*core_validation::GetImageLayoutMap(device_data)).end()) {
             layouts.push_back(img_data->second.layout);
         }
+    }
+    return true;
+}
+bool FindLayout(const std::unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap, ImageSubresourcePair imgpair, VkImageLayout &layout,
+                const VkImageAspectFlags aspectMask) {
+    if (!(imgpair.subresource.aspectMask & aspectMask)) {
+        return false;
+    }
+    imgpair.subresource.aspectMask = aspectMask;
+    auto imgsubIt = imageLayoutMap.find(imgpair);
+    if (imgsubIt == imageLayoutMap.end()) {
+        return false;
+    }
+    layout = imgsubIt->second.layout;
+    return true;
+ }
+
+// find layout in supplied map
+bool FindLayout(const std::unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> &imageLayoutMap, ImageSubresourcePair imgpair, VkImageLayout &layout) {
+    layout = VK_IMAGE_LAYOUT_MAX_ENUM;
+    FindLayout(imageLayoutMap, imgpair, layout, VK_IMAGE_ASPECT_COLOR_BIT);
+    FindLayout(imageLayoutMap, imgpair, layout, VK_IMAGE_ASPECT_DEPTH_BIT);
+    FindLayout(imageLayoutMap, imgpair, layout, VK_IMAGE_ASPECT_STENCIL_BIT);
+    FindLayout(imageLayoutMap, imgpair, layout, VK_IMAGE_ASPECT_METADATA_BIT);
+    if (layout == VK_IMAGE_LAYOUT_MAX_ENUM) {
+        imgpair = {imgpair.image, false, VkImageSubresource()};
+        auto imgsubIt = imageLayoutMap.find(imgpair);
+        if (imgsubIt == imageLayoutMap.end()) return false;
+        layout = imgsubIt->second.layout;
     }
     return true;
 }
