@@ -4154,8 +4154,8 @@ static bool ValidateCmdBufImageLayouts(layer_data *dev_data, GLOBAL_CB_NODE *pCB
     return skip_call;
 }
 
-// Loop through bound objects and either increment their in_use counts
-// or flag an error for unknown opjects
+// Loop through bound objects and increment their in_use counts if increment parameter is true
+// or flag an error if unknown objects are found
 static bool ValidateOrIncrementBoundObjects(layer_data *dev_data, GLOBAL_CB_NODE const *cb_node, bool increment) {
     bool skip = false;
     DRAW_STATE_ERROR error_code = DRAWSTATE_NONE;
@@ -4238,7 +4238,7 @@ static bool ValidateOrIncrementBoundObjects(layer_data *dev_data, GLOBAL_CB_NODE
         }
         if (base_obj && increment) {
             base_obj->in_use.fetch_add(1);
-        } else if (!base_obj) {
+        } else if (!base_obj && !increment) {
             skip |=
                 log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, obj.type, obj.handle, __LINE__, error_code, "DS",
                         "Cannot submit cmd buffer using deleted %s 0x%" PRIx64 ".", object_type_to_string(obj.type), obj.handle);
@@ -4635,25 +4635,27 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
         return true;
     }
 
+    unordered_set<VkSemaphore> signaled_semaphores;
+    unordered_set<VkSemaphore> unsignaled_semaphores;
     // Now verify each individual submit
     for (uint32_t submit_idx = 0; submit_idx < submitCount; submit_idx++) {
         const VkSubmitInfo *submit = &pSubmits[submit_idx];
-        vector<SEMAPHORE_WAIT> semaphore_waits;
-        vector<VkSemaphore> semaphore_signals;
         for (uint32_t i = 0; i < submit->waitSemaphoreCount; ++i) {
             skip_call |= ValidateStageMaskGsTsEnables(dev_data, submit->pWaitDstStageMask[i], "vkQueueSubmit()",
                                                       VALIDATION_ERROR_00142, VALIDATION_ERROR_00143);
             VkSemaphore semaphore = submit->pWaitSemaphores[i];
             auto pSemaphore = getSemaphoreNode(dev_data, semaphore);
             if (pSemaphore) {
-                if (!pSemaphore->signaled) {
+                if (unsignaled_semaphores.count(semaphore) ||
+                        (!(signaled_semaphores.count(semaphore)) && !(pSemaphore->signaled))) {
                     skip_call |=
                         log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT,
                                 reinterpret_cast<const uint64_t &>(semaphore), __LINE__, DRAWSTATE_QUEUE_FORWARD_PROGRESS, "DS",
                                 "Queue 0x%p is waiting on semaphore 0x%" PRIx64 " that has no way to be signaled.", queue,
                                 reinterpret_cast<const uint64_t &>(semaphore));
                 } else {
-                    pSemaphore->signaled = false;
+                    signaled_semaphores.erase(semaphore);
+                    unsignaled_semaphores.insert(semaphore);
                 }
             }
         }
@@ -4661,7 +4663,8 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
             VkSemaphore semaphore = submit->pSignalSemaphores[i];
             auto pSemaphore = getSemaphoreNode(dev_data, semaphore);
             if (pSemaphore) {
-                if (pSemaphore->signaled) {
+                if (signaled_semaphores.count(semaphore) ||
+                        (!(unsignaled_semaphores.count(semaphore)) && pSemaphore->signaled)) {
                     skip_call |=
                         log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT,
                                 reinterpret_cast<const uint64_t &>(semaphore), __LINE__, DRAWSTATE_QUEUE_FORWARD_PROGRESS, "DS",
@@ -4670,7 +4673,8 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
                                 queue, reinterpret_cast<const uint64_t &>(semaphore),
                                 reinterpret_cast<uint64_t &>(pSemaphore->signaler.first));
                 } else {
-                    pSemaphore->signaled = true;
+                    unsignaled_semaphores.erase(semaphore);
+                    signaled_semaphores.insert(semaphore);
                 }
             }
         }
