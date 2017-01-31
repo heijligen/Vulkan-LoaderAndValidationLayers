@@ -4419,9 +4419,9 @@ static void SubmitFence(QUEUE_STATE *pQueue, FENCE_NODE *pFence, uint64_t submit
     pFence->signaler.second = pQueue->seq + pQueue->submissions.size() + submitCount;
 }
 
-static bool validateCommandBufferSimultaneousUse(layer_data *dev_data, GLOBAL_CB_NODE *pCB) {
+static bool validateCommandBufferSimultaneousUse(layer_data *dev_data, GLOBAL_CB_NODE *pCB, int current_submit_count) {
     bool skip_call = false;
-    if (dev_data->globalInFlightCmdBuffers.count(pCB->commandBuffer) &&
+    if ((dev_data->globalInFlightCmdBuffers.count(pCB->commandBuffer) || current_submit_count > 1) &&
         !(pCB->beginInfo.flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT)) {
         skip_call |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT,
                              0, __LINE__, VALIDATION_ERROR_00133, "DS",
@@ -4431,11 +4431,11 @@ static bool validateCommandBufferSimultaneousUse(layer_data *dev_data, GLOBAL_CB
     return skip_call;
 }
 
-static bool validateCommandBufferState(layer_data *dev_data, GLOBAL_CB_NODE *pCB, const char *call_source) {
+static bool validateCommandBufferState(layer_data *dev_data, GLOBAL_CB_NODE *pCB, const char *call_source, int current_submit_count) {
     bool skip = false;
     if (dev_data->instance_data->disabled.command_buffer_state) return skip;
     // Validate ONE_TIME_SUBMIT_BIT CB is not being submitted more than once
-    if ((pCB->beginInfo.flags & VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) && (pCB->submitCount > 0)) {
+    if ((pCB->beginInfo.flags & VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT) && (pCB->submitCount + current_submit_count > 1)) {
         skip |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT, 0,
                         __LINE__, DRAWSTATE_COMMAND_BUFFER_SINGLE_SUBMIT_VIOLATION, "DS",
                         "Commandbuffer 0x%p was begun w/ VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT "
@@ -4508,13 +4508,13 @@ static bool validateQueueFamilyIndices(layer_data *dev_data, GLOBAL_CB_NODE *pCB
     return skip_call;
 }
 
-static bool validatePrimaryCommandBufferState(layer_data *dev_data, GLOBAL_CB_NODE *pCB) {
+static bool validatePrimaryCommandBufferState(layer_data *dev_data, GLOBAL_CB_NODE *pCB, int current_submit_count) {
     // Track in-use for resources off of primary and any secondary CBs
     bool skip_call = false;
 
     // If USAGE_SIMULTANEOUS_USE_BIT not set then CB cannot already be executing
     // on device
-    skip_call |= validateCommandBufferSimultaneousUse(dev_data, pCB);
+    skip_call |= validateCommandBufferSimultaneousUse(dev_data, pCB, current_submit_count);
 
     skip_call |= validateResources(dev_data, pCB);
 
@@ -4535,7 +4535,7 @@ static bool validatePrimaryCommandBufferState(layer_data *dev_data, GLOBAL_CB_NO
         }
     }
 
-    skip_call |= validateCommandBufferState(dev_data, pCB, "vkQueueSubmit()");
+    skip_call |= validateCommandBufferState(dev_data, pCB, "vkQueueSubmit()", current_submit_count);
 
     return skip_call;
 }
@@ -4637,6 +4637,7 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
 
     unordered_set<VkSemaphore> signaled_semaphores;
     unordered_set<VkSemaphore> unsignaled_semaphores;
+    unordered_set<VkCommandBuffer> current_cmds;
     // Now verify each individual submit
     for (uint32_t submit_idx = 0; submit_idx < submitCount; submit_idx++) {
         const VkSubmitInfo *submit = &pSubmits[submit_idx];
@@ -4687,7 +4688,8 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
                     cbs->push_back(secondaryCmdBuffer);
                 }
 
-                skip_call |= validatePrimaryCommandBufferState(dev_data, cb_node);
+                current_cmds.insert(submit->pCommandBuffers[i]);
+                skip_call |= validatePrimaryCommandBufferState(dev_data, cb_node, (int) current_cmds.count(submit->pCommandBuffers[i]));
                 skip_call |= validateQueueFamilyIndices(dev_data, cb_node, queue);
 
                 // Potential early exit here as bad object state may crash in delayed function calls
@@ -10684,7 +10686,7 @@ VKAPI_ATTR void VKAPI_CALL CmdExecuteCommands(VkCommandBuffer commandBuffer, uin
             }
             // TODO(mlentine): Move more logic into this method
             skip_call |= validateSecondaryCommandBufferState(dev_data, pCB, pSubCB);
-            skip_call |= validateCommandBufferState(dev_data, pSubCB, "vkCmdExecuteCommands()");
+            skip_call |= validateCommandBufferState(dev_data, pSubCB, "vkCmdExecuteCommands()", 0);
             // Secondary cmdBuffers are considered pending execution starting w/
             // being recorded
             if (!(pSubCB->beginInfo.flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT)) {
