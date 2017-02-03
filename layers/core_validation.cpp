@@ -8614,6 +8614,16 @@ VKAPI_ATTR void VKAPI_CALL CmdCopyBufferToImage(VkCommandBuffer commandBuffer, V
                     validation_error_map[VALIDATION_ERROR_01241]);
         }
 
+        // dstImageLayout must be a valid VkImageLayout value (possibly redundant - a more restrictive check is done below)
+        if ((dstImageLayout <= VK_IMAGE_LAYOUT_BEGIN_RANGE) || (dstImageLayout > VK_IMAGE_LAYOUT_END_RANGE))
+        {
+            skip_call |=
+                log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT,
+                (uint64_t)cb_node->createInfo.commandPool, __LINE__, VALIDATION_ERROR_01238, "DS",
+                    "vkCmdCopyBufferToImage() called with an invalid value for dstImageLayout parameter. %s.",
+                    validation_error_map[VALIDATION_ERROR_01238]);
+        }
+
         skip_call |= ValidateImageSampleCount(dev_data, dst_image_state, VK_SAMPLE_COUNT_1_BIT,
                                               "vkCmdCopyBufferToImage(): dstImage", VALIDATION_ERROR_01232);
         skip_call |= ValidateMemoryIsBoundToBuffer(dev_data, src_buff_state, "vkCmdCopyBufferToImage()", VALIDATION_ERROR_02535);
@@ -8642,7 +8652,14 @@ VKAPI_ATTR void VKAPI_CALL CmdCopyBufferToImage(VkCommandBuffer commandBuffer, V
                                                                                 "vkCmdCopyBufferToImage()");
         }
     } else {
-        assert(0);
+        //assert(0); 
+
+        // command buffer, source buffer, and dest image must all belong to the same device
+        skip_call |=
+            log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT,
+            (uint64_t)0, __LINE__, VALIDATION_ERROR_01244, "DS",
+                "vkCmdCopyBufferToImage() called with commandBuffer, dstImage, and srcBuffer which are not all from the same VkDevice. %s.",
+                validation_error_map[VALIDATION_ERROR_01244]);
     }
     lock.unlock();
     if (!skip_call)
