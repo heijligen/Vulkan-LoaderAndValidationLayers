@@ -41,9 +41,10 @@
 #include "vk_loader_platform.h"
 #include "loader.h"
 #include "gpa_helper.h"
-#include "table_ops.h"
+#include "vk_loader_dispatch_init.h"
 #include "debug_report.h"
 #include "wsi.h"
+#include "vk_icd_dispatch_table.h"
 #include "extensions.h"
 #include "vulkan/vk_icd.h"
 #include "cJSON.h"
@@ -85,127 +86,6 @@ loader_platform_thread_mutex loader_lock;
 loader_platform_thread_mutex loader_json_lock;
 
 const char *std_validation_str = "VK_LAYER_LUNARG_standard_validation";
-
-// This table contains the loader's instance dispatch table, which contains
-// default functions if no instance layers are activated.  This contains
-// pointers to "terminator functions".
-const VkLayerInstanceDispatchTable instance_disp = {
-    .GetInstanceProcAddr = vkGetInstanceProcAddr,
-    .DestroyInstance = terminator_DestroyInstance,
-    .EnumeratePhysicalDevices = terminator_EnumeratePhysicalDevices,
-    .GetPhysicalDeviceFeatures = terminator_GetPhysicalDeviceFeatures,
-    .GetPhysicalDeviceFormatProperties = terminator_GetPhysicalDeviceFormatProperties,
-    .GetPhysicalDeviceImageFormatProperties = terminator_GetPhysicalDeviceImageFormatProperties,
-    .GetPhysicalDeviceProperties = terminator_GetPhysicalDeviceProperties,
-    .GetPhysicalDeviceQueueFamilyProperties = terminator_GetPhysicalDeviceQueueFamilyProperties,
-    .GetPhysicalDeviceMemoryProperties = terminator_GetPhysicalDeviceMemoryProperties,
-    .EnumerateDeviceExtensionProperties = terminator_EnumerateDeviceExtensionProperties,
-    .EnumerateDeviceLayerProperties = terminator_EnumerateDeviceLayerProperties,
-    .GetPhysicalDeviceSparseImageFormatProperties = terminator_GetPhysicalDeviceSparseImageFormatProperties,
-    .DestroySurfaceKHR = terminator_DestroySurfaceKHR,
-    .GetPhysicalDeviceSurfaceSupportKHR = terminator_GetPhysicalDeviceSurfaceSupportKHR,
-    .GetPhysicalDeviceSurfaceCapabilitiesKHR = terminator_GetPhysicalDeviceSurfaceCapabilitiesKHR,
-    .GetPhysicalDeviceSurfaceFormatsKHR = terminator_GetPhysicalDeviceSurfaceFormatsKHR,
-    .GetPhysicalDeviceSurfacePresentModesKHR = terminator_GetPhysicalDeviceSurfacePresentModesKHR,
-#ifdef VK_USE_PLATFORM_MIR_KHR
-    .CreateMirSurfaceKHR = terminator_CreateMirSurfaceKHR,
-    .GetPhysicalDeviceMirPresentationSupportKHR = terminator_GetPhysicalDeviceMirPresentationSupportKHR,
-#endif
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-    .CreateWaylandSurfaceKHR = terminator_CreateWaylandSurfaceKHR,
-    .GetPhysicalDeviceWaylandPresentationSupportKHR = terminator_GetPhysicalDeviceWaylandPresentationSupportKHR,
-#endif
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-    .CreateWin32SurfaceKHR = terminator_CreateWin32SurfaceKHR,
-    .GetPhysicalDeviceWin32PresentationSupportKHR = terminator_GetPhysicalDeviceWin32PresentationSupportKHR,
-#endif
-#ifdef VK_USE_PLATFORM_XCB_KHR
-    .CreateXcbSurfaceKHR = terminator_CreateXcbSurfaceKHR,
-    .GetPhysicalDeviceXcbPresentationSupportKHR = terminator_GetPhysicalDeviceXcbPresentationSupportKHR,
-#endif
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-    .CreateXlibSurfaceKHR = terminator_CreateXlibSurfaceKHR,
-    .GetPhysicalDeviceXlibPresentationSupportKHR = terminator_GetPhysicalDeviceXlibPresentationSupportKHR,
-#endif
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-    .CreateAndroidSurfaceKHR = terminator_CreateAndroidSurfaceKHR,
-#endif
-    .GetPhysicalDeviceDisplayPropertiesKHR = terminator_GetPhysicalDeviceDisplayPropertiesKHR,
-    .GetPhysicalDeviceDisplayPlanePropertiesKHR = terminator_GetPhysicalDeviceDisplayPlanePropertiesKHR,
-    .GetDisplayPlaneSupportedDisplaysKHR = terminator_GetDisplayPlaneSupportedDisplaysKHR,
-    .GetDisplayModePropertiesKHR = terminator_GetDisplayModePropertiesKHR,
-    .CreateDisplayModeKHR = terminator_CreateDisplayModeKHR,
-    .GetDisplayPlaneCapabilitiesKHR = terminator_GetDisplayPlaneCapabilitiesKHR,
-    .CreateDisplayPlaneSurfaceKHR = terminator_CreateDisplayPlaneSurfaceKHR,
-
-    // KHR_get_physical_device_properties2
-    .GetPhysicalDeviceFeatures2KHR = terminator_GetPhysicalDeviceFeatures2KHR,
-    .GetPhysicalDeviceProperties2KHR = terminator_GetPhysicalDeviceProperties2KHR,
-    .GetPhysicalDeviceFormatProperties2KHR = terminator_GetPhysicalDeviceFormatProperties2KHR,
-    .GetPhysicalDeviceImageFormatProperties2KHR = terminator_GetPhysicalDeviceImageFormatProperties2KHR,
-    .GetPhysicalDeviceQueueFamilyProperties2KHR = terminator_GetPhysicalDeviceQueueFamilyProperties2KHR,
-    .GetPhysicalDeviceMemoryProperties2KHR = terminator_GetPhysicalDeviceMemoryProperties2KHR,
-    .GetPhysicalDeviceSparseImageFormatProperties2KHR = terminator_GetPhysicalDeviceSparseImageFormatProperties2KHR,
-
-#ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
-    // EXT_acquire_xlib_display
-    .AcquireXlibDisplayEXT = terminator_AcquireXlibDisplayEXT,
-    .GetRandROutputDisplayEXT = terminator_GetRandROutputDisplayEXT,
-#endif
-
-    // EXT_debug_report
-    .CreateDebugReportCallbackEXT = terminator_CreateDebugReportCallback,
-    .DestroyDebugReportCallbackEXT = terminator_DestroyDebugReportCallback,
-    .DebugReportMessageEXT = terminator_DebugReportMessage,
-
-    // EXT_direct_mode_display
-    .ReleaseDisplayEXT = terminator_ReleaseDisplayEXT,
-
-    // EXT_display_surface_counter
-    .GetPhysicalDeviceSurfaceCapabilities2EXT = terminator_GetPhysicalDeviceSurfaceCapabilities2EXT,
-
-    // NV_external_memory_capabilities
-    .GetPhysicalDeviceExternalImageFormatPropertiesNV = terminator_GetPhysicalDeviceExternalImageFormatPropertiesNV,
-
-    // NVX_device_generated_commands
-    .GetPhysicalDeviceGeneratedCommandsPropertiesNVX = terminator_GetPhysicalDeviceGeneratedCommandsPropertiesNVX,
-};
-
-// A null-terminated list of all of the instance extensions supported by the
-// loader
-static const char *const LOADER_INSTANCE_EXTENSIONS[] = {VK_KHR_SURFACE_EXTENSION_NAME,
-                                                         VK_KHR_DISPLAY_EXTENSION_NAME,
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-                                                         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
-#endif
-#ifdef VK_USE_PLATFORM_XCB_KHR
-                                                         VK_KHR_XCB_SURFACE_EXTENSION_NAME,
-#endif
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-                                                         VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME,
-#endif
-#ifdef VK_USE_PLATFORM_MIR_KHR
-                                                         VK_KHR_MIR_SURFACE_EXTENSION_NAME,
-#endif
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-                                                         VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
-#endif
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-                                                         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#endif
-                                                         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-#ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
-                                                         VK_EXT_ACQUIRE_XLIB_DISPLAY_EXTENSION_NAME,
-#endif
-                                                         VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-                                                         VK_EXT_DIRECT_MODE_DISPLAY_EXTENSION_NAME,
-                                                         VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME,
-                                                         VK_EXT_VALIDATION_FLAGS_EXTENSION_NAME,
-#ifdef VK_USE_PLATFORM_VI_NN
-                                                         VK_NN_VI_SURFACE_EXTENSION_NAME,
-#endif
-                                                         VK_NV_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
-                                                         NULL};
 
 LOADER_PLATFORM_THREAD_ONCE_DECLARATION(once_init);
 
@@ -1611,105 +1491,6 @@ static VkResult loader_scanned_icd_add(const struct loader_instance *inst, struc
 out:
 
     return res;
-}
-
-static bool loader_icd_init_entrys(struct loader_icd_term *icd_term, VkInstance inst, const PFN_vkGetInstanceProcAddr fp_gipa) {
-/* initialize entrypoint function pointers */
-
-#define LOOKUP_GIPA(func, required)                                                        \
-    do {                                                                                   \
-        icd_term->func = (PFN_vk##func)fp_gipa(inst, "vk" #func);                          \
-        if (!icd_term->func && required) {                                                 \
-            loader_log((struct loader_instance *)inst, VK_DEBUG_REPORT_WARNING_BIT_EXT, 0, \
-                       loader_platform_get_proc_address_error("vk" #func));                \
-            return false;                                                                  \
-        }                                                                                  \
-    } while (0)
-
-    LOOKUP_GIPA(GetDeviceProcAddr, true);
-    LOOKUP_GIPA(DestroyInstance, true);
-    LOOKUP_GIPA(EnumeratePhysicalDevices, true);
-    LOOKUP_GIPA(GetPhysicalDeviceFeatures, true);
-    LOOKUP_GIPA(GetPhysicalDeviceFormatProperties, true);
-    LOOKUP_GIPA(GetPhysicalDeviceImageFormatProperties, true);
-    LOOKUP_GIPA(CreateDevice, true);
-    LOOKUP_GIPA(GetPhysicalDeviceProperties, true);
-    LOOKUP_GIPA(GetPhysicalDeviceMemoryProperties, true);
-    LOOKUP_GIPA(GetPhysicalDeviceQueueFamilyProperties, true);
-    LOOKUP_GIPA(EnumerateDeviceExtensionProperties, true);
-    LOOKUP_GIPA(GetPhysicalDeviceSparseImageFormatProperties, true);
-    LOOKUP_GIPA(GetPhysicalDeviceSurfaceSupportKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceSurfaceCapabilitiesKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceSurfaceFormatsKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceSurfacePresentModesKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceDisplayPropertiesKHR, false);
-    LOOKUP_GIPA(GetDisplayModePropertiesKHR, false);
-    LOOKUP_GIPA(CreateDisplayPlaneSurfaceKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceDisplayPlanePropertiesKHR, false);
-    LOOKUP_GIPA(GetDisplayPlaneSupportedDisplaysKHR, false);
-    LOOKUP_GIPA(CreateDisplayModeKHR, false);
-    LOOKUP_GIPA(GetDisplayPlaneCapabilitiesKHR, false);
-    LOOKUP_GIPA(DestroySurfaceKHR, false);
-    LOOKUP_GIPA(CreateSwapchainKHR, false);
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-    LOOKUP_GIPA(CreateWin32SurfaceKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceWin32PresentationSupportKHR, false);
-#endif
-#ifdef VK_USE_PLATFORM_XCB_KHR
-    LOOKUP_GIPA(CreateXcbSurfaceKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceXcbPresentationSupportKHR, false);
-#endif
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-    LOOKUP_GIPA(CreateXlibSurfaceKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceXlibPresentationSupportKHR, false);
-#endif
-#ifdef VK_USE_PLATFORM_MIR_KHR
-    LOOKUP_GIPA(CreateMirSurfaceKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceMirPresentationSupportKHR, false);
-#endif
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-    LOOKUP_GIPA(CreateWaylandSurfaceKHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceWaylandPresentationSupportKHR, false);
-#endif
-    LOOKUP_GIPA(CreateSharedSwapchainsKHR, false);
-
-    // KHR_get_physical_device_properties2
-    LOOKUP_GIPA(GetPhysicalDeviceFeatures2KHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceProperties2KHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceFormatProperties2KHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceImageFormatProperties2KHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceQueueFamilyProperties2KHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceMemoryProperties2KHR, false);
-    LOOKUP_GIPA(GetPhysicalDeviceSparseImageFormatProperties2KHR, false);
-    // EXT_debug_marker (items needing a trampoline/terminator)
-    LOOKUP_GIPA(DebugMarkerSetObjectTagEXT, false);
-    LOOKUP_GIPA(DebugMarkerSetObjectNameEXT, false);
-
-#ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
-    // EXT_acquire_xlib_display
-    LOOKUP_GIPA(AcquireXlibDisplayEXT, false);
-    LOOKUP_GIPA(GetRandROutputDisplayEXT, false);
-#endif
-
-    // EXT_debug_report
-    LOOKUP_GIPA(CreateDebugReportCallbackEXT, false);
-    LOOKUP_GIPA(DestroyDebugReportCallbackEXT, false);
-    LOOKUP_GIPA(DebugReportMessageEXT, false);
-
-    // EXT_direct_mode_display
-    LOOKUP_GIPA(ReleaseDisplayEXT, false);
-
-    // EXT_display_surface_counter
-    LOOKUP_GIPA(GetPhysicalDeviceSurfaceCapabilities2EXT, false);
-
-    // NV_external_memory_capabilities
-    LOOKUP_GIPA(GetPhysicalDeviceExternalImageFormatPropertiesNV, false);
-    // NVX_device_generated_commands
-    LOOKUP_GIPA(GetPhysicalDeviceGeneratedCommandsPropertiesNVX, false);
-
-#undef LOOKUP_GIPA
-
-    return true;
 }
 
 static void loader_debug_init(void) {
@@ -3401,6 +3182,12 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL loader_gpa_device_internal(VkDevice dev
     struct loader_device *dev;
     struct loader_icd_term *icd_term = loader_get_icd_and_device(device, &dev, NULL);
 
+    // Return this function if a layer above here is asking for the vkGetDeviceProcAddr.
+    // This is so we can properly intercept any device commands needing a terminator.
+    if (!strcmp(pName, "vkGetDeviceProcAddr")) {
+        return (PFN_vkVoidFunction)loader_gpa_device_internal;
+    }
+
     // NOTE: Device Funcs needing Trampoline/Terminator.
     // Overrides for device functions needing a trampoline and
     // a terminator because certain device entry-points still need to go
@@ -3409,19 +3196,12 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL loader_gpa_device_internal(VkDevice dev
     // object before passing the appropriate info along to the ICD.
     // This is why we also have to override the direct ICD call to
     // vkGetDeviceProcAddr to intercept those calls.
-    if (!strcmp(pName, "vkGetDeviceProcAddr")) {
-        return (PFN_vkVoidFunction)loader_gpa_device_internal;
-    } else if (!strcmp(pName, "vkCreateSwapchainKHR")) {
-        return (PFN_vkVoidFunction)terminator_vkCreateSwapchainKHR;
-    } else if (!strcmp(pName, "vkCreateSharedSwapchainsKHR")) {
-        return (PFN_vkVoidFunction)terminator_vkCreateSharedSwapchainsKHR;
-    } else if (!strcmp(pName, "vkDebugMarkerSetObjectTagEXT")) {
-        return (PFN_vkVoidFunction)terminator_DebugMarkerSetObjectTagEXT;
-    } else if (!strcmp(pName, "vkDebugMarkerSetObjectNameEXT")) {
-        return (PFN_vkVoidFunction)terminator_DebugMarkerSetObjectNameEXT;
+    PFN_vkVoidFunction addr = get_extension_device_proc_terminator(pName);
+    if (NULL != addr) {
+        return addr;
     }
 
-    return icd_term->GetDeviceProcAddr(device, pName);
+    return icd_term->dispatch.GetDeviceProcAddr(device, pName);
 }
 
 /**
@@ -4633,8 +4413,8 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateInstance(const VkInstanceCreateI
             continue;
         }
 
-        if (!loader_icd_init_entrys(icd_term, icd_term->instance,
-                                    ptr_instance->icd_tramp_list.scanned_list[i].GetInstanceProcAddr)) {
+        if (!loader_icd_init_entries(icd_term, icd_term->instance,
+                                     ptr_instance->icd_tramp_list.scanned_list[i].GetInstanceProcAddr)) {
             loader_log(ptr_instance, VK_DEBUG_REPORT_WARNING_BIT_EXT, 0,
                        "terminator_CreateInstance: Failed to CreateInstance and find "
                        "entrypoints with ICD.  Skipping ICD.");
@@ -4659,7 +4439,7 @@ out:
             icd_term = ptr_instance->icd_terms;
             ptr_instance->icd_terms = icd_term->next;
             if (NULL != icd_term->instance) {
-                icd_term->DestroyInstance(icd_term->instance, pAllocator);
+                icd_term->dispatch.DestroyInstance(icd_term->instance, pAllocator);
             }
             loader_icd_destroy(ptr_instance, icd_term, pAllocator);
         }
@@ -4694,7 +4474,7 @@ VKAPI_ATTR void VKAPI_CALL terminator_DestroyInstance(VkInstance instance, const
 
     while (NULL != icd_terms) {
         if (icd_terms->instance) {
-            icd_terms->DestroyInstance(icd_terms->instance, pAllocator);
+            icd_terms->dispatch.DestroyInstance(icd_terms->instance, pAllocator);
         }
         next_icd_term = icd_terms->next;
         icd_terms->instance = VK_NULL_HANDLE;
@@ -4724,7 +4504,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDevice(VkPhysicalDevice physical
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
 
     struct loader_device *dev = (struct loader_device *)*pDevice;
-    PFN_vkCreateDevice fpCreateDevice = icd_term->CreateDevice;
+    PFN_vkCreateDevice fpCreateDevice = icd_term->dispatch.CreateDevice;
     struct loader_extension_list icd_exts;
 
     dev->phys_dev_term = phys_dev_term;
@@ -4769,7 +4549,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDevice(VkPhysicalDevice physical
         goto out;
     }
 
-    res = loader_add_device_extensions(icd_term->this_instance, icd_term->EnumerateDeviceExtensionProperties,
+    res = loader_add_device_extensions(icd_term->this_instance, icd_term->dispatch.EnumerateDeviceExtensionProperties,
                                        phys_dev_term->phys_dev, icd_term->scanned_icd->lib_name, &icd_exts);
     if (res != VK_SUCCESS) {
         goto out;
@@ -4956,7 +4736,7 @@ VkResult setupLoaderTermPhysDevs(struct loader_instance *inst) {
     // For each ICD, query the number of physical devices, and then get an
     // internal value for those physical devices.
     for (uint32_t icd_idx = 0; NULL != icd_term; icd_term = icd_term->next, icd_idx++) {
-        res = icd_term->EnumeratePhysicalDevices(icd_term->instance, &icd_phys_dev_array[icd_idx].count, NULL);
+        res = icd_term->dispatch.EnumeratePhysicalDevices(icd_term->instance, &icd_phys_dev_array[icd_idx].count, NULL);
         if (VK_SUCCESS != res) {
             loader_log(inst, VK_DEBUG_REPORT_ERROR_BIT_EXT, 0,
                        "setupLoaderTermPhysDevs:  Call to "
@@ -4977,8 +4757,8 @@ VkResult setupLoaderTermPhysDevs(struct loader_instance *inst) {
             goto out;
         }
 
-        res = icd_term->EnumeratePhysicalDevices(icd_term->instance, &(icd_phys_dev_array[icd_idx].count),
-                                                 icd_phys_dev_array[icd_idx].phys_devs);
+        res = icd_term->dispatch.EnumeratePhysicalDevices(icd_term->instance, &(icd_phys_dev_array[icd_idx].count),
+                                                          icd_phys_dev_array[icd_idx].phys_devs);
         if (VK_SUCCESS != res) {
             goto out;
         }
@@ -5122,8 +4902,8 @@ VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceProperties(VkPhysicalDevi
                                                                   VkPhysicalDeviceProperties *pProperties) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL != icd_term->GetPhysicalDeviceProperties) {
-        icd_term->GetPhysicalDeviceProperties(phys_dev_term->phys_dev, pProperties);
+    if (NULL != icd_term->dispatch.GetPhysicalDeviceProperties) {
+        icd_term->dispatch.GetPhysicalDeviceProperties(phys_dev_term->phys_dev, pProperties);
     }
 }
 
@@ -5132,8 +4912,8 @@ VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceQueueFamilyProperties(VkP
                                                                              VkQueueFamilyProperties *pProperties) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL != icd_term->GetPhysicalDeviceQueueFamilyProperties) {
-        icd_term->GetPhysicalDeviceQueueFamilyProperties(phys_dev_term->phys_dev, pQueueFamilyPropertyCount, pProperties);
+    if (NULL != icd_term->dispatch.GetPhysicalDeviceQueueFamilyProperties) {
+        icd_term->dispatch.GetPhysicalDeviceQueueFamilyProperties(phys_dev_term->phys_dev, pQueueFamilyPropertyCount, pProperties);
     }
 }
 
@@ -5141,8 +4921,8 @@ VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceMemoryProperties(VkPhysic
                                                                         VkPhysicalDeviceMemoryProperties *pProperties) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL != icd_term->GetPhysicalDeviceMemoryProperties) {
-        icd_term->GetPhysicalDeviceMemoryProperties(phys_dev_term->phys_dev, pProperties);
+    if (NULL != icd_term->dispatch.GetPhysicalDeviceMemoryProperties) {
+        icd_term->dispatch.GetPhysicalDeviceMemoryProperties(phys_dev_term->phys_dev, pProperties);
     }
 }
 
@@ -5150,8 +4930,8 @@ VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceFeatures(VkPhysicalDevice
                                                                 VkPhysicalDeviceFeatures *pFeatures) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL != icd_term->GetPhysicalDeviceFeatures) {
-        icd_term->GetPhysicalDeviceFeatures(phys_dev_term->phys_dev, pFeatures);
+    if (NULL != icd_term->dispatch.GetPhysicalDeviceFeatures) {
+        icd_term->dispatch.GetPhysicalDeviceFeatures(phys_dev_term->phys_dev, pFeatures);
     }
 }
 
@@ -5159,8 +4939,8 @@ VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceFormatProperties(VkPhysic
                                                                         VkFormatProperties *pFormatInfo) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL != icd_term->GetPhysicalDeviceFormatProperties) {
-        icd_term->GetPhysicalDeviceFormatProperties(phys_dev_term->phys_dev, format, pFormatInfo);
+    if (NULL != icd_term->dispatch.GetPhysicalDeviceFormatProperties) {
+        icd_term->dispatch.GetPhysicalDeviceFormatProperties(phys_dev_term->phys_dev, format, pFormatInfo);
     }
 }
 
@@ -5170,14 +4950,14 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_GetPhysicalDeviceImageFormatProperties
                                                                                  VkImageFormatProperties *pImageFormatProperties) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL == icd_term->GetPhysicalDeviceImageFormatProperties) {
+    if (NULL == icd_term->dispatch.GetPhysicalDeviceImageFormatProperties) {
         loader_log(icd_term->this_instance, VK_DEBUG_REPORT_ERROR_BIT_EXT, 0,
                    "Encountered the vkEnumerateDeviceLayerProperties "
                    "terminator.  This means a layer improperly continued.");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-    return icd_term->GetPhysicalDeviceImageFormatProperties(phys_dev_term->phys_dev, format, type, tiling, usage, flags,
-                                                            pImageFormatProperties);
+    return icd_term->dispatch.GetPhysicalDeviceImageFormatProperties(phys_dev_term->phys_dev, format, type, tiling, usage, flags,
+                                                                     pImageFormatProperties);
 }
 
 VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
@@ -5187,9 +4967,9 @@ VKAPI_ATTR void VKAPI_CALL terminator_GetPhysicalDeviceSparseImageFormatProperti
                                                                                    VkSparseImageFormatProperties *pProperties) {
     struct loader_physical_device_term *phys_dev_term = (struct loader_physical_device_term *)physicalDevice;
     struct loader_icd_term *icd_term = phys_dev_term->this_icd_term;
-    if (NULL != icd_term->GetPhysicalDeviceSparseImageFormatProperties) {
-        icd_term->GetPhysicalDeviceSparseImageFormatProperties(phys_dev_term->phys_dev, format, type, samples, usage, tiling,
-                                                               pNumProperties, pProperties);
+    if (NULL != icd_term->dispatch.GetPhysicalDeviceSparseImageFormatProperties) {
+        icd_term->dispatch.GetPhysicalDeviceSparseImageFormatProperties(phys_dev_term->phys_dev, format, type, samples, usage,
+                                                                        tiling, pNumProperties, pProperties);
     }
 }
 
@@ -5215,7 +4995,7 @@ VKAPI_ATTR VkResult VKAPI_CALL terminator_EnumerateDeviceExtensionProperties(VkP
     VkResult res;
 
     /* get device extensions */
-    res = icd_term->EnumerateDeviceExtensionProperties(phys_dev_term->phys_dev, NULL, &icd_ext_count, pProperties);
+    res = icd_term->dispatch.EnumerateDeviceExtensionProperties(phys_dev_term->phys_dev, NULL, &icd_ext_count, pProperties);
     if (res != VK_SUCCESS) {
         goto out;
     }

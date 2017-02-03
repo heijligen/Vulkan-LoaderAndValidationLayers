@@ -266,6 +266,12 @@ endmacro()
 
 # Custom target for generated vulkan helper file dependencies
 add_custom_target(generate_helper_files DEPENDS
+    vk_loader_core_terminators.h
+    vk_loader_dispatch_init.h
+    vk_icd_dispatch_table.h
+    vk_icd_dispatch_table.c
+    vk_loader_extensions.c
+    vk_layer_dispatch_table.h
     vk_dispatch_table_helper.h
     vk_enum_string_helper.h
     vk_struct_size_helper.h
@@ -280,7 +286,13 @@ run_vk_xml_generate(helper_file_generator.py vk_safe_struct.cpp)
 run_vk_xml_generate(helper_file_generator.py vk_struct_size_helper.h)
 run_vk_xml_generate(helper_file_generator.py vk_struct_size_helper.c)
 run_vk_xml_generate(helper_file_generator.py vk_enum_string_helper.h)
-run_vk_xml_generate(dispatch_table_generator.py vk_dispatch_table_helper.h)
+run_vk_xml_generate(dispatch_table_helper_generator.py vk_dispatch_table_helper.h)
+run_vk_xml_generate(layer_dispatch_table_generator.py vk_layer_dispatch_table.h)
+run_vk_xml_generate(icd_dispatch_table_generator.py vk_icd_dispatch_table.h)
+run_vk_xml_generate(icd_dispatch_table_generator.py vk_icd_dispatch_table.c)
+run_vk_xml_generate(loader_extension_generator.py vk_loader_extensions.c)
+run_vk_xml_generate(loader_dispatch_init.py vk_loader_dispatch_init.h)
+run_vk_xml_generate(loader_dispatch_init.py vk_loader_core_terminators.h)
 
 if(NOT WIN32)
     include(GNUInstallDirs)

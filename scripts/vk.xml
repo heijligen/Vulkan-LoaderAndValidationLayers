@@ -63,6 +63,8 @@ maintained in the master branch of the Khronos Vulkan GitHub project.
         <tag name="TIZEN"       author="Samsung Electronics Co., Ltd." contact="Alon Or-bach @alonorbach"/>
         <tag name="RENDERDOC"   author="RenderDoc (renderdoc.org)"     contact="baldurk@baldurk.org"/>
         <tag name="NN"          author="Nintendo Co., Ltd."            contact="Yasuhiro Yoshioka @yoshioka_yasuhiro"/>
+        <tag name="KHR"         author="Khronos"                       contact="Tom Olson @tom.olson"/>
+        <tag name="EXT"         author="Multivendor"                   contact="Jon Leech @oddhack"/>
     </tags>
 
     <!-- SECTION: Vulkan type definitions -->
@@ -4806,7 +4808,7 @@ maintained in the master branch of the Khronos Vulkan GitHub project.
                 <type name="VkWin32KeyedMutexAcquireReleaseInfoNV"/>
             </require>
         </extension>
-        <extension name="VK_KHR_get_physical_device_properties2" number="60" author="KHR" contact="Jeff Bolz @jbolz" supported="vulkan">
+        <extension name="VK_KHR_get_physical_device_properties2" number="60" type="instance" author="KHR" contact="Jeff Bolz @jbolz" supported="vulkan">
             <require>
                 <enum value="1"                                           name="VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_SPEC_VERSION"/>
                 <enum value="&quot;VK_KHR_get_physical_device_properties2&quot;" name="VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME"/>
@@ -4851,7 +4853,7 @@ maintained in the master branch of the Khronos Vulkan GitHub project.
                 <type name="VkValidationFlagsEXT"/>
             </require>
         </extension>
-        <extension name="VK_NN_vi_surface" number="63" author="NN" contact="Mathias Heyer @mheyer" type="instance" requires="VK_KHR_surface" protect="VK_USE_PLATFORM_VI_NN" supported="vulkan">
+        <extension name="VK_NN_vi_surface" number="63" type="instance" author="NN" contact="Mathias Heyer @mheyer" requires="VK_KHR_surface" protect="VK_USE_PLATFORM_VI_NN" supported="vulkan">
             <require>
                 <enum value="1"                                         name="VK_NN_VI_SURFACE_SPEC_VERSION"/>
                 <enum value="&quot;VK_NN_vi_surface&quot;"              name="VK_NN_VI_SURFACE_EXTENSION_NAME"/>
@@ -4867,13 +4869,13 @@ maintained in the master branch of the Khronos Vulkan GitHub project.
                 <enum value="&quot;VK_KHR_shader_draw_parameters&quot;" name="VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME"/>
             </require>
         </extension>
-        <extension name="VK_EXT_shader_subgroup_ballot" number="65" author="NVIDIA" contact="Daniel Koch @dgkoch" supported="vulkan">
+        <extension name="VK_EXT_shader_subgroup_ballot" number="65" type="device" author="NVIDIA" contact="Daniel Koch @dgkoch" supported="vulkan">
             <require>
                 <enum value="1"                                         name="VK_EXT_SHADER_SUBGROUP_BALLOT_SPEC_VERSION"/>
                 <enum value="&quot;VK_EXT_shader_subgroup_ballot&quot;" name="VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME"/>
             </require>
         </extension>
-        <extension name="VK_EXT_shader_subgroup_vote" number="66" author="NVIDIA" contact="Daniel Koch @dgkoch" supported="vulkan">
+        <extension name="VK_EXT_shader_subgroup_vote" number="66" type="device" author="NVIDIA" contact="Daniel Koch @dgkoch" supported="vulkan">
             <require>
                 <enum value="1"                                         name="VK_EXT_SHADER_SUBGROUP_VOTE_SPEC_VERSION"/>
                 <enum value="&quot;VK_EXT_shader_subgroup_vote&quot;"   name="VK_EXT_SHADER_SUBGROUP_VOTE_EXTENSION_NAME"/>
@@ -4897,7 +4899,7 @@ maintained in the master branch of the Khronos Vulkan GitHub project.
                 <enum value="&quot;VK_IMG_extension_69&quot;"           name="VK_IMG_EXTENSION_69_EXTENSION_NAME"/>
             </require>
         </extension>
-        <extension name="VK_KHR_maintenance1" number="70" author="KHR" contact="Piers Daniell @pdaniell" supported="vulkan">
+        <extension name="VK_KHR_maintenance1" number="70" type="device" author="KHR" contact="Piers Daniell @pdaniell" supported="vulkan">
             <require>
                 <enum value="1"                                         name="VK_KHR_MAINTENANCE1_SPEC_VERSION"/>
                 <enum value="&quot;VK_KHR_maintenance1&quot;"           name="VK_KHR_MAINTENANCE1_EXTENSION_NAME"/>
@@ -5263,6 +5265,12 @@ maintained in the master branch of the Khronos Vulkan GitHub project.
              <require>
                  <enum value="0"                                         name="VK_KHR_EXTENSION_117_SPEC_VERSION"/>
                  <enum value="&quot;VK_KHR_extension_117&quot;"           name="VK_KHR_EXTENSION_117_EXTENSION_NAME"/>
+             </require>
+         </extension>
+         <extension name="VK_KHR_extension_118" number="118" author="KHR" contact="Michael Worcester @michaelworcester" supported="disabled">
+             <require>
+                 <enum value="0"                                         name="VK_KHR_EXTENSION_118_SPEC_VERSION"/>
+                 <enum value="&quot;VK_KHR_extension_118&quot;"           name="VK_KHR_EXTENSION_118_EXTENSION_NAME"/>
              </require>
          </extension>
     </extensions>

@@ -32,7 +32,7 @@
 #include "wsi.h"
 #include "extensions.h"
 #include "gpa_helper.h"
-#include "table_ops.h"
+#include "vk_loader_dispatch_init.h"
 
 /* Trampoline entrypoints are in this file for core Vulkan commands */
 /**

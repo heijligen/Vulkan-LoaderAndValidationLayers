@@ -96,13 +96,13 @@ if (WIN32)
     )
     add_library(VkLayer_${target} SHARED ${ARGN} VkLayer_${target}.def)
     target_link_Libraries(VkLayer_${target} VkLayer_utils)
-    add_dependencies(VkLayer_${target} generate_helper_files VkLayer_utils)
+    add_dependencies(VkLayer_${target} VkLayer_utils)
     endmacro()
 else()
     macro(add_vk_layer target)
     add_library(VkLayer_${target} SHARED ${ARGN})
     target_link_Libraries(VkLayer_${target} VkLayer_utils)
-    add_dependencies(VkLayer_${target} generate_helper_files VkLayer_utils)
+    add_dependencies(VkLayer_${target} VkLayer_utils)
     set_target_properties(VkLayer_${target} PROPERTIES LINK_FLAGS "-Wl,-Bsymbolic,--exclude-libs,ALL")
     install(TARGETS VkLayer_${target} DESTINATION ${CMAKE_INSTALL_LIBDIR})
     endmacro()
@@ -113,6 +113,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../loader
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/vulkan
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_PROJECT_BINARY_DIR}
     ${CMAKE_BINARY_DIR}
 )
 
@@ -138,8 +139,10 @@ run_vk_xml_generate(unique_objects_generator.py unique_objects_wrappers.h)
 # path that can't be easily modified to point it to the same directory that contains the layers.
 if (WIN32)
     add_library(VkLayer_utils STATIC vk_layer_config.cpp vk_layer_extension_utils.cpp vk_layer_utils.cpp)
+    add_dependencies(VkLayer_utils generate_helper_files)
 else()
     add_library(VkLayer_utils SHARED vk_layer_config.cpp vk_layer_extension_utils.cpp vk_layer_utils.cpp)
+    add_dependencies(VkLayer_utils generate_helper_files)
     install(TARGETS VkLayer_utils DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 

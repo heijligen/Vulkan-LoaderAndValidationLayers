@@ -106,17 +106,17 @@ void debug_report_create_instance(struct loader_instance *ptr_instance, const Vk
 
 bool debug_report_instance_gpa(struct loader_instance *ptr_instance, const char *name, void **addr);
 
-VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugReportCallback(VkInstance instance,
-                                                                    const VkDebugReportCallbackCreateInfoEXT *pCreateInfo,
-                                                                    const VkAllocationCallbacks *pAllocator,
-                                                                    VkDebugReportCallbackEXT *pCallback);
+VKAPI_ATTR VkResult VKAPI_CALL terminator_CreateDebugReportCallbackEXT(VkInstance instance,
+                                                                       const VkDebugReportCallbackCreateInfoEXT *pCreateInfo,
+                                                                       const VkAllocationCallbacks *pAllocator,
+                                                                       VkDebugReportCallbackEXT *pCallback);
 
-VKAPI_ATTR void VKAPI_CALL terminator_DestroyDebugReportCallback(VkInstance instance, VkDebugReportCallbackEXT callback,
-                                                                 const VkAllocationCallbacks *pAllocator);
+VKAPI_ATTR void VKAPI_CALL terminator_DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback,
+                                                                    const VkAllocationCallbacks *pAllocator);
 
-VKAPI_ATTR void VKAPI_CALL terminator_DebugReportMessage(VkInstance instance, VkDebugReportFlagsEXT flags,
-                                                         VkDebugReportObjectTypeEXT objType, uint64_t object, size_t location,
-                                                         int32_t msgCode, const char *pLayerPrefix, const char *pMsg);
+VKAPI_ATTR void VKAPI_CALL terminator_DebugReportMessageEXT(VkInstance instance, VkDebugReportFlagsEXT flags,
+                                                            VkDebugReportObjectTypeEXT objType, uint64_t object, size_t location,
+                                                            int32_t msgCode, const char *pLayerPrefix, const char *pMsg);
 
 VkResult util_CreateDebugReportCallback(struct loader_instance *inst, VkDebugReportCallbackCreateInfoEXT *pCreateInfo,
                                         const VkAllocationCallbacks *pAllocator, VkDebugReportCallbackEXT callback);

@@ -24,8 +24,12 @@ from generator import write
 from threading_generator import  ThreadGeneratorOptions, ThreadOutputGenerator
 from parameter_validation_generator import ParamCheckerGeneratorOptions, ParamCheckerOutputGenerator
 from unique_objects_generator import UniqueObjectsGeneratorOptions, UniqueObjectsOutputGenerator
-from dispatch_table_generator import DispatchTableOutputGenerator, DispatchTableOutputGeneratorOptions
+from dispatch_table_helper_generator import DispatchTableHelperOutputGenerator, DispatchTableHelperOutputGeneratorOptions
+from icd_dispatch_table_generator import IcdDispatchTableOutputGenerator, IcdDispatchTableOutputGeneratorOptions
+from layer_dispatch_table_generator import LayerDispatchTableOutputGenerator, LayerDispatchTableOutputGeneratorOptions
 from helper_file_generator import HelperFileOutputGenerator, HelperFileOutputGeneratorOptions
+from loader_dispatch_init import LoaderDispatchTableOutputGenerator, LoaderDispatchTableOutputGeneratorOptions
+from loader_extension_generator import LoaderExtensionOutputGenerator, LoaderExtensionGeneratorOptions
 
 # Simple timer functions
 startTime = None
@@ -163,12 +167,137 @@ def makeGenOpts(extensions = [], removeExtensions = [], protect = True, director
             alignFuncParam    = 48)
         ]
 
+    # Options for the ICD dispatch table generator header
+    genOpts['vk_icd_dispatch_table.h'] = [
+          IcdDispatchTableOutputGenerator,
+          IcdDispatchTableOutputGeneratorOptions(
+            filename          = 'vk_icd_dispatch_table.h',
+            directory         = directory,
+            apiname           = 'vulkan',
+            profile           = None,
+            versions          = allVersions,
+            emitversions      = allVersions,
+            defaultExtensions = 'vulkan',
+            addExtensions     = addExtensions,
+            removeExtensions  = removeExtensions,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            protectFeature    = False,
+            apicall           = 'VKAPI_ATTR ',
+            apientry          = 'VKAPI_CALL ',
+            apientryp         = 'VKAPI_PTR *',
+            alignFuncParam    = 48)
+        ]
+
+    # Options for the ICD dispatch table generator source
+    genOpts['vk_icd_dispatch_table.c'] = [
+          IcdDispatchTableOutputGenerator,
+          IcdDispatchTableOutputGeneratorOptions(
+            filename          = 'vk_icd_dispatch_table.c',
+            directory         = directory,
+            apiname           = 'vulkan',
+            profile           = None,
+            versions          = allVersions,
+            emitversions      = allVersions,
+            defaultExtensions = 'vulkan',
+            addExtensions     = addExtensions,
+            removeExtensions  = removeExtensions,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            protectFeature    = False,
+            apicall           = 'VKAPI_ATTR ',
+            apientry          = 'VKAPI_CALL ',
+            apientryp         = 'VKAPI_PTR *',
+            alignFuncParam    = 48)
+        ]
+
+    # Options for Layer dispatch table generator
+    genOpts['vk_layer_dispatch_table.h'] = [
+          LayerDispatchTableOutputGenerator,
+          LayerDispatchTableOutputGeneratorOptions(
+            filename          = 'vk_layer_dispatch_table.h',
+            directory         = directory,
+            apiname           = 'vulkan',
+            profile           = None,
+            versions          = allVersions,
+            emitversions      = allVersions,
+            defaultExtensions = 'vulkan',
+            addExtensions     = addExtensions,
+            removeExtensions  = removeExtensions,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            protectFeature    = False,
+            apicall           = 'VKAPI_ATTR ',
+            apientry          = 'VKAPI_CALL ',
+            apientryp         = 'VKAPI_PTR *',
+            alignFuncParam    = 48)
+        ]
 
     # Options for dispatch table helper generator
     genOpts['vk_dispatch_table_helper.h'] = [
-          DispatchTableOutputGenerator,
-          DispatchTableOutputGeneratorOptions(
+          DispatchTableHelperOutputGenerator,
+          DispatchTableHelperOutputGeneratorOptions(
             filename          = 'vk_dispatch_table_helper.h',
+            directory         = directory,
+            apiname           = 'vulkan',
+            profile           = None,
+            versions          = allVersions,
+            emitversions      = allVersions,
+            defaultExtensions = 'vulkan',
+            addExtensions     = addExtensions,
+            removeExtensions  = removeExtensions,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            protectFeature    = False,
+            apicall           = 'VKAPI_ATTR ',
+            apientry          = 'VKAPI_CALL ',
+            apientryp         = 'VKAPI_PTR *',
+            alignFuncParam    = 48)
+        ]
+
+    # Options for loader dispatch init generator
+    genOpts['vk_loader_dispatch_init.h'] = [
+          LoaderDispatchTableOutputGenerator,
+          LoaderDispatchTableOutputGeneratorOptions(
+            filename          = 'vk_loader_dispatch_init.h',
+            directory         = directory,
+            apiname           = 'vulkan',
+            profile           = None,
+            versions          = allVersions,
+            emitversions      = allVersions,
+            defaultExtensions = 'vulkan',
+            addExtensions     = addExtensions,
+            removeExtensions  = removeExtensions,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            protectFeature    = False,
+            apicall           = 'VKAPI_ATTR ',
+            apientry          = 'VKAPI_CALL ',
+            apientryp         = 'VKAPI_PTR *',
+            alignFuncParam    = 48)
+        ]
+
+    # Options for loader terminator header generator
+    genOpts['vk_loader_core_terminators.h'] = [
+          LoaderDispatchTableOutputGenerator,
+          LoaderDispatchTableOutputGeneratorOptions(
+            filename          = 'vk_loader_core_terminators.h',
+            directory         = directory,
+            apiname           = 'vulkan',
+            profile           = None,
+            versions          = allVersions,
+            emitversions      = allVersions,
+            defaultExtensions = 'vulkan',
+            addExtensions     = addExtensions,
+            removeExtensions  = removeExtensions,
+            prefixText        = prefixStrings + vkPrefixStrings,
+            protectFeature    = False,
+            apicall           = 'VKAPI_ATTR ',
+            apientry          = 'VKAPI_CALL ',
+            apientryp         = 'VKAPI_PTR *',
+            alignFuncParam    = 48)
+        ]
+
+    # Options for loader extension source generator
+    genOpts['vk_loader_extensions.c'] = [
+          LoaderExtensionOutputGenerator,
+          LoaderExtensionGeneratorOptions(
+            filename          = 'vk_loader_extensions.c',
             directory         = directory,
             apiname           = 'vulkan',
             profile           = None,

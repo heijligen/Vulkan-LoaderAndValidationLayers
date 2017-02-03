@@ -1,7 +1,10 @@
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}
 	${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_PROJECT_BINARY_DIR}
+    ${CMAKE_BINARY_DIR}
 )
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_definitions(-DVK_USE_PLATFORM_WIN32_KHR -DWIN32_LEAN_AND_MEAN)
     set(DisplayServer Win32)
@@ -39,6 +42,12 @@ endif()
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
+run_vk_xml_generate(icd_dispatch_table_generator.py ${CMAKE_BINARY_DIR}/vk_icd_dispatch_table.h)
+run_vk_xml_generate(icd_dispatch_table_generator.py ${CMAKE_BINARY_DIR}/vk_icd_dispatch_table.c)
+run_vk_xml_generate(loader_extension_generator.py ${CMAKE_BINARY_DIR}/vk_loader_extensions.c)
+run_vk_xml_generate(loader_dispatch_init.py ${CMAKE_BINARY_DIR}/vk_loader_dispatch_init.h)
+run_vk_xml_generate(loader_dispatch_init.py ${CMAKE_BINARY_DIR}/vk_loader_core_terminators.h)
+
 set(NORMAL_LOADER_SRCS
     loader.c
     loader.h
@@ -47,11 +56,9 @@ set(NORMAL_LOADER_SRCS
     trampoline.c
     wsi.c
     wsi.h
-    extensions.c
     extensions.h
     debug_report.c
     debug_report.h
-    table_ops.h
     gpa_helper.h
     cJSON.c
     cJSON.h
@@ -64,8 +71,17 @@ set (OPT_LOADER_SRCS
     phys_dev_ext.c
 )
 
-set (LOADER_SRCS ${NORMAL_LOADER_SRCS} ${OPT_LOADER_SRCS})
+set(GENERATED_LOADER_SRCS
+    ${CMAKE_BINARY_DIR}/vk_icd_dispatch_table.h
+    ${CMAKE_BINARY_DIR}/vk_icd_dispatch_table.c
+	${CMAKE_BINARY_DIR}/vk_loader_extensions.c
+	${CMAKE_BINARY_DIR}/vk_loader_dispatch_init.h
+	${CMAKE_BINARY_DIR}/vk_loader_core_terminators.h
+)
+
+set (LOADER_SRCS ${GENERATED_LOADER_SRCS} ${NORMAL_LOADER_SRCS} ${OPT_LOADER_SRCS})
 add_definitions(-DAPI_NAME="${API_NAME}")
+
 
 if (WIN32)
     # Use static MSVCRT libraries
@@ -84,7 +100,7 @@ if (WIN32)
     set(CMAKE_C_FLAGS_DEBUG " ")
     separate_arguments(LOCAL_C_FLAGS_REL WINDOWS_COMMAND ${CMAKE_C_FLAGS_RELEASE})
 
-    add_library(loader-norm OBJECT ${NORMAL_LOADER_SRCS} dirent_on_windows.c)
+    add_library(loader-norm OBJECT ${GENERATED_LOADER_SRCS} ${NORMAL_LOADER_SRCS} dirent_on_windows.c)
     target_compile_options(loader-norm PUBLIC "$<$<CONFIG:DEBUG>:${LOCAL_C_FLAGS_DBG}>")
     add_library(loader-opt OBJECT ${OPT_LOADER_SRCS})
     target_compile_options(loader-opt PUBLIC "$<$<CONFIG:DEBUG>:${LOCAL_C_FLAGS_REL}>")
@@ -94,6 +110,9 @@ if (WIN32)
     set_target_properties(${API_LOWERCASE}-${MAJOR} PROPERTIES LINK_FLAGS_DEBUG /ignore:4098)
     set_target_properties(VKstatic.${MAJOR} PROPERTIES OUTPUT_NAME VKstatic.${MAJOR})
     target_link_libraries(${API_LOWERCASE}-${MAJOR} shlwapi)
+
+    add_dependencies(${API_LOWERCASE}-${MAJOR} generate_helper_files)
+
     target_link_libraries(VKstatic.${MAJOR} shlwapi)
     if (CMAKE_GENERATOR MATCHES "^Visual Studio.*")
         file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIGURATION>/${API_LOWERCASE}-${MAJOR}.dll COPY_SRC_PATH)
@@ -115,5 +134,8 @@ else()
     add_library(${API_LOWERCASE} SHARED ${LOADER_SRCS})
     set_target_properties(${API_LOWERCASE} PROPERTIES SOVERSION "1" VERSION "1.0.39")
     target_link_libraries(${API_LOWERCASE} -ldl -lpthread -lm)
+
+    add_dependencies(${API_LOWERCASE} generate_helper_files)
+
     install(TARGETS ${API_LOWERCASE} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
