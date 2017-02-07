@@ -4449,7 +4449,7 @@ static bool validateCommandBufferState(layer_data *dev_data, GLOBAL_CB_NODE *pCB
                         __LINE__, DRAWSTATE_COMMAND_BUFFER_SINGLE_SUBMIT_VIOLATION, "DS",
                         "Commandbuffer 0x%p was begun w/ VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT "
                         "set, but has been submitted 0x%" PRIxLEAST64 " times.",
-                        pCB->commandBuffer, pCB->submitCount);
+                        pCB->commandBuffer, pCB->submitCount + current_submit_count);
     }
     // Validate that cmd buffers have been updated
     if (CB_RECORDED != pCB->state) {
@@ -4652,7 +4652,7 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
 
     unordered_set<VkSemaphore> signaled_semaphores;
     unordered_set<VkSemaphore> unsignaled_semaphores;
-    unordered_set<VkCommandBuffer> current_cmds;
+    vector<VkCommandBuffer> current_cmds;
     unordered_map<ImageSubresourcePair, IMAGE_LAYOUT_NODE> localImageLayoutMap = dev_data->imageLayoutMap;
     // Now verify each individual submit
     for (uint32_t submit_idx = 0; submit_idx < submitCount; submit_idx++) {
@@ -4699,8 +4699,9 @@ static bool PreCallValidateQueueSubmit(layer_data *dev_data, VkQueue queue, uint
             auto cb_node = getCBNode(dev_data, submit->pCommandBuffers[i]);
             skip_call |= ValidateCmdBufImageLayouts(dev_data, cb_node, localImageLayoutMap);
             if (cb_node) {
-                current_cmds.insert(submit->pCommandBuffers[i]);
-                skip_call |= validatePrimaryCommandBufferState(dev_data, cb_node, (int) current_cmds.count(submit->pCommandBuffers[i]));
+                current_cmds.push_back(submit->pCommandBuffers[i]);
+                skip_call |= validatePrimaryCommandBufferState(dev_data, cb_node,
+                                     (int) std::count(current_cmds.begin(), current_cmds.end(), submit->pCommandBuffers[i]));
                 skip_call |= validateQueueFamilyIndices(dev_data, cb_node, queue);
 
                 // Potential early exit here as bad object state may crash in delayed function calls
