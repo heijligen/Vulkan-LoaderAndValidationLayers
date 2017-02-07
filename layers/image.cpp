@@ -590,14 +590,36 @@ static bool ValidateBufferImageCopyData(layer_data *dev_data, uint32_t regionCou
     for (uint32_t i = 0; i < regionCount; i++) {
         auto image_info = getImageState(dev_data, image);
         if (image_info) {
+            if (image_info->imageType == VK_IMAGE_TYPE_1D) {
+                if ((pRegions[i].imageOffset.y != 0) || (pRegions[i].imageExtent.height != 1)) {
+                    skip |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                                    reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01746, "IMAGE",
+                                    "%s(): pRegion[%d] imageOffset.y is %d and imageExtent.height is %d. For 1D images these "
+                                    "must be 0 and 1, respectively. %s",
+                                    function, i, pRegions[i].imageOffset.y, pRegions[i].imageExtent.height,
+                                    validation_error_map[VALIDATION_ERROR_01746]);
+                }
+            }
+
             if ((image_info->imageType == VK_IMAGE_TYPE_1D) || (image_info->imageType == VK_IMAGE_TYPE_2D)) {
                 if ((pRegions[i].imageOffset.z != 0) || (pRegions[i].imageExtent.depth != 1)) {
                     skip |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
-                                    reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01269, "IMAGE",
-                                    "%s(): pRegion[%d] imageOffset.z is %d and imageExtent.depth is %d.  These must be 0 and 1, "
-                                    "respectively. %s",
+                                    reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01747, "IMAGE",
+                                    "%s(): pRegion[%d] imageOffset.z is %d and imageExtent.depth is %d. For 1D and 2D images these "
+                                    "must be 0 and 1, respectively. %s",
                                     function, i, pRegions[i].imageOffset.z, pRegions[i].imageExtent.depth,
-                                    validation_error_map[VALIDATION_ERROR_01269]);
+                                    validation_error_map[VALIDATION_ERROR_01747]);
+                }
+            }
+
+            if (image_info->imageType == VK_IMAGE_TYPE_3D) {
+                if ((0 != pRegions[i].imageSubresource.baseArrayLayer) || (1 != pRegions[i].imageSubresource.layerCount)) {
+                    skip |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                                    reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01281, "IMAGE",
+                                    "%s(): pRegion[%d] imageSubresource.baseArrayLayer is %d and imageSubresource.layerCount is "
+                                    "%d. For 3D images these must be 0 and 1, respectively. %s",
+                                    function, i, pRegions[i].imageSubresource.baseArrayLayer,
+                                    pRegions[i].imageSubresource.layerCount, validation_error_map[VALIDATION_ERROR_01281]);
                 }
             }
 
@@ -640,14 +662,83 @@ static bool ValidateBufferImageCopyData(layer_data *dev_data, uint32_t regionCou
                     validation_error_map[VALIDATION_ERROR_01266]);
             }
 
+            // subresource aspectMask must have exactly 1 bit set
             const int num_bits = sizeof(VkFlags) * CHAR_BIT;
             std::bitset<num_bits> aspect_mask_bits(pRegions[i].imageSubresource.aspectMask);
             if (aspect_mask_bits.count() != 1) {
                 skip |=
-                    log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT,
+                    log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
                             reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01280, "IMAGE",
                             "%s: aspectMasks for imageSubresource in each region must have only a single bit set. %s", function,
                             validation_error_map[VALIDATION_ERROR_01280]);
+            }
+
+            // image subresource aspect bit must match image usage flags
+            VkImageUsageFlags image_useage_flags = image_info->usage;
+            if (((0 != (pRegions[i].imageSubresource.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT)) && (0 == (image_useage_flags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))) ||
+                ((0 != (pRegions[i].imageSubresource.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT)) && (0 == (image_useage_flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT))) ||
+                ((0 != (pRegions[i].imageSubresource.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT)) && (0 == (image_useage_flags & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT))))
+            {
+                skip |= log_msg(dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                    reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01279, "IMAGE",
+                    "%s(): pRegion[%d] subresource aspectMask %x specifies aspects that are not included in image usage flags %x. %s",
+                    function, i, pRegions[i].imageSubresource.aspectMask, image_useage_flags,
+                    validation_error_map[VALIDATION_ERROR_01279]);
+            }
+
+            // Checks that apply only to compressed images
+            // TODO: there is a comment in ValidateCopyBufferImageTransferGranularityRequirements() in core_validation.cpp that
+            //       reserves a place for these compressed image checks.  This block of code could move there once the image
+            //       stuff is moved into core validation.
+            if (vk_format_is_compressed(image_info->format))
+            {
+                VkExtent2D block_size = vk_format_compressed_block_size(image_info->format);
+
+                //  BufferRowLength must be a multiple of block width 
+                if (vk_safe_modulo(pRegions[i].bufferRowLength, block_size.width) != 0)
+                {
+                    skip |= log_msg(
+                        dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                        reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01271, "IMAGE",
+                        "%s(): pRegion[%d] bufferRowLength (%d) must be a multiple of the compressed image's texel width (%d). %s.",
+                        function, i, pRegions[i].bufferRowLength, block_size.width,
+                        validation_error_map[VALIDATION_ERROR_01271]);
+                }
+
+                //  BufferRowHeight must be a multiple of block height
+                if (vk_safe_modulo(pRegions[i].bufferImageHeight, block_size.height) != 0)
+                {
+                    skip |= log_msg(
+                        dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                        reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01272, "IMAGE",
+                        "%s(): pRegion[%d] bufferImageHeight (%d) must be a multiple of the compressed image's texel height (%d). %s.",
+                        function, i, pRegions[i].bufferImageHeight, block_size.height,
+                        validation_error_map[VALIDATION_ERROR_01272]);
+                }
+
+                //  image offsets must be multiples of block dimensions
+                if ((vk_safe_modulo(pRegions[i].imageOffset.x, block_size.width) != 0) ||
+                    (vk_safe_modulo(pRegions[i].imageOffset.y, block_size.height) != 0))
+                {
+                    skip |= log_msg(
+                        dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                        reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01273, "IMAGE",
+                        "%s(): pRegion[%d] imageOffset(x,y) (%d, %d) must be multiples of the compressed image's texel width & height (%d, %d). %s.",
+                        function, i, pRegions[i].imageOffset.x, pRegions[i].imageOffset.y, block_size.width, block_size.height,
+                        validation_error_map[VALIDATION_ERROR_01273]);
+                }
+
+                // bufferOffset must be a multiple of block size (linear bytes)
+                int block_size_in_bytes = block_size.width * block_size.height;
+                if (vk_safe_modulo(pRegions[i].bufferOffset, block_size_in_bytes) != 0)
+                {
+                    skip |= log_msg(
+                        dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                        reinterpret_cast<uint64_t &>(image), __LINE__, VALIDATION_ERROR_01274, "IMAGE",
+                        "%s(): pRegion[%d] bufferOffset (%d) must be a multiple of the compressed image's texel block size (%d). %s.",
+                        function, i, pRegions[i].bufferOffset, block_size_in_bytes,
+                        validation_error_map[VALIDATION_ERROR_01274]);
+                }
             }
         }
     }
