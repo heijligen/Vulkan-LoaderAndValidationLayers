@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2016 The Khronos Group Inc.
- * Copyright (c) 2015-2016 Valve Corporation
- * Copyright (c) 2015-2016 LunarG, Inc.
- * Copyright (c) 2015-2016 Google, Inc.
+ * Copyright (c) 2015-2017 The Khronos Group Inc.
+ * Copyright (c) 2015-2017 Valve Corporation
+ * Copyright (c) 2015-2017 LunarG, Inc.
+ * Copyright (c) 2015-2017 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@
 #include "test_common.h"
 #include "vk_layer_config.h"
 #include "vk_validation_error_messages.h"
+#include "vktestbinding.h"
 #include "vkrenderframework.h"
 #include <limits.h>
 #include <unordered_set>
@@ -3293,6 +3294,53 @@ TEST_F(VkLayerTest, DisabledIndependentBlend) {
     m_errorMonitor->VerifyFound();
     vkDestroyRenderPass(m_device->device(), renderpass, NULL);
 }
+
+/////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+// Perturb a good Pipeline's configuration to trigger VALIDATION_ERROR_02116
+class PipelineObj_VU2116 : public VkPipelineObj {
+   public:
+    PipelineObj_VU2116(VkDeviceObj *dev_obj) : VkPipelineObj(dev_obj) {}
+
+    VkResult init_try(const vk_testing::Device &dev, const VkGraphicsPipelineCreateInfo &info) {
+        const_cast<VkGraphicsPipelineCreateInfo &>(info).pColorBlendState = nullptr;
+        return VkPipelineObj::init_try(*m_device, info);
+    }
+};
+}
+
+// Is the Pipeline compatible with the expectations of the Renderpass/subpasses?
+TEST_F(VkLayerTest, PipelineRenderpassCompatibility) {
+    TEST_DESCRIPTION(
+        "Create a graphics pipeline that is incompatible with the requirements "
+        "of its contained Renderpass/subpasses.");
+    ASSERT_NO_FATAL_FAILURE(InitState());
+
+    VkDescriptorSetObj ds_obj(m_device);
+    ds_obj.AppendDummy();
+    ds_obj.CreateVKDescriptorSet(m_commandBuffer);
+
+    VkShaderObj vs_obj(m_device, bindStateVertShaderText, VK_SHADER_STAGE_VERTEX_BIT, this);
+
+    VkPipelineColorBlendAttachmentState att_state1 = {};
+    att_state1.dstAlphaBlendFactor = VK_BLEND_FACTOR_CONSTANT_COLOR;
+    att_state1.blendEnable = VK_TRUE;
+
+    VkRenderpassObj rp_obj(m_device);
+
+    {
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, VALIDATION_ERROR_02116);
+        PipelineObj_VU2116 pipeline(m_device);
+        pipeline.AddShader(&vs_obj);
+        pipeline.AddColorAttachment(0, &att_state1);
+        pipeline.CreateVKPipeline(ds_obj.GetPipelineLayout(), rp_obj.handle());
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
 
 #if 0
 TEST_F(VkLayerTest, RenderPassDepthStencilAttachmentUnused) {
