@@ -311,7 +311,7 @@ static bool RegionIntersects(const VkImageCopy *src, const VkImageCopy *dst, VkI
 }
 
 // Returns true if offset and extent exceed image extents
-static bool ExceedsBounds(const VkOffset3D *offset, const VkExtent3D *extent, const IMAGE_STATE *image) {
+static bool ExceedsImageBounds(const VkOffset3D *offset, const VkExtent3D *extent, const IMAGE_STATE *image) {
     bool result = false;
     // Extents/depths cannot be negative but checks left in for clarity
     switch (image->imageType) {
@@ -335,6 +335,43 @@ static bool ExceedsBounds(const VkOffset3D *offset, const VkExtent3D *extent, co
             break;
         default:
             assert(false);
+    }
+    return result;
+}
+
+// Returns true if offset and extent exceed buffer extents
+static bool ExceedsBufferBounds(const VkBufferImageCopy *region, const IMAGE_STATE *image) 
+{
+    bool result = false;
+
+    VkExtent3D copy_extent = region->imageExtent;
+
+    VkDeviceSize buffer_width = (0 == region->bufferRowLength ? image->extent.width : region->bufferRowLength);
+    VkDeviceSize buffer_height = (0 == region->bufferImageHeight ? image->extent.height : region->bufferImageHeight);
+
+    if (vk_format_is_compressed(image->format))
+    {
+        VkExtent2D texel_block_extent = vk_format_compressed_block_size(image->format);
+        buffer_width /= texel_block_extent.width;       // switch to texel block units
+        buffer_height /= texel_block_extent.height; 
+        copy_extent.width /= texel_block_extent.width;
+        copy_extent.height /= texel_block_extent.height;
+        
+        VkDeviceSize texel_block_size = texel_block_extent.width * texel_block_extent.height;
+        VkDeviceSize buffer_limit = buffer_width * buffer_height * texel_block_size;
+
+        VkDeviceSize copy_extent_in_texel_blocks = (((copy_extent.depth * buffer_height) + copy_extent.height) * buffer_width) + copy_extent.width;
+        VkDeviceSize final_buffer_address = region->bufferOffset + (texel_block_size * copy_extent_in_texel_blocks);
+
+        result = (final_buffer_address >= buffer_limit); // true if extent exceeds buffer limit
+    } else {
+        VkDeviceSize texel_size = vk_format_get_size(image->format);
+        VkDeviceSize buffer_limit = buffer_width * buffer_height * texel_size;
+
+        VkDeviceSize copy_extent_in_texels = (((copy_extent.depth * buffer_height) + copy_extent.height) * buffer_width) + copy_extent.width;
+        VkDeviceSize final_buffer_address = region->bufferOffset + (texel_size * copy_extent_in_texels);
+        
+        result = (final_buffer_address >= buffer_limit); // true if extent exceeds buffer limit
     }
     return result;
 }
@@ -466,7 +503,7 @@ bool PreCallValidateCmdCopyImage(VkCommandBuffer command_buffer, VkImage src_ima
             }
 
             // The source region specified by a given element of regions must be a region that is contained within srcImage
-            if (ExceedsBounds(&regions[i].srcOffset, &regions[i].extent, src_image_entry)) {
+            if (ExceedsImageBounds(&regions[i].srcOffset, &regions[i].extent, src_image_entry)) {
                 std::stringstream ss;
                 ss << "vkCmdCopyImage: srcSubResource in pRegions[" << i << "] exceeds extents srcImage was created with";
                 skip |=
@@ -476,7 +513,7 @@ bool PreCallValidateCmdCopyImage(VkCommandBuffer command_buffer, VkImage src_ima
             }
 
             // The destination region specified by a given element of regions must be a region that is contained within dst_image
-            if (ExceedsBounds(&regions[i].dstOffset, &regions[i].extent, dst_image_entry)) {
+            if (ExceedsImageBounds(&regions[i].dstOffset, &regions[i].extent, dst_image_entry)) {
                 std::stringstream ss;
                 ss << "vkCmdCopyImage: dstSubResource in pRegions[" << i << "] exceeds extents dstImage was created with";
                 skip |=
@@ -746,16 +783,39 @@ static bool ValidateBufferImageCopyData(layer_data *dev_data, uint32_t regionCou
     return skip;
 }
 
-static bool PreCallValidateCmdCopyImageToBuffer(layer_data *dev_data, VkImage srcImage, uint32_t regionCount,
+static bool PreCallValidateCmdCopyImageToBuffer(layer_data *dev_data, VkImage srcImage, VkBuffer dstBuffer, uint32_t regionCount,
                                                 const VkBufferImageCopy *pRegions, const char *func_name) {
-    return ValidateBufferImageCopyData(dev_data, regionCount, pRegions, srcImage, "vkCmdCopyImageToBuffer");
+    bool skip = ValidateBufferImageCopyData(dev_data, regionCount, pRegions, srcImage, "vkCmdCopyImageToBuffer");
+
+    auto image_info = getImageState(dev_data, srcImage);
+    for (uint32_t i = 0; i < regionCount; i++) 
+    {
+        // The source region specified by a given element of regions must be a region that is contained within srcImage
+        if (ExceedsImageBounds(&pRegions[i].imageOffset, &pRegions[i].imageExtent, image_info)) {
+            skip |= log_msg(
+                dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                reinterpret_cast<uint64_t &>(srcImage), __LINE__, VALIDATION_ERROR_01245, "IMAGE",
+                "vkCmdCopyImageToBuffer(): pRegion[%d] offset + extent exceeds the image size. %s.",
+                i, validation_error_map[VALIDATION_ERROR_01245]);
+        }
+
+        // The destination region specified by a given element of regions must be a region that is contained within dstBuffer
+        if (ExceedsBufferBounds(&pRegions[i], image_info)) {
+            skip |= log_msg(
+                dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                reinterpret_cast<uint64_t &>(srcImage), __LINE__, VALIDATION_ERROR_01246, "IMAGE",
+                "vkCmdCopyImageToBuffer(): pRegion[%d] offset + extent exceeds the buffer size. %s.",
+                i, validation_error_map[VALIDATION_ERROR_01246]);
+        }
+    }
+    return skip;
 }
 
 VKAPI_ATTR void VKAPI_CALL CmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                 VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy *pRegions) {
     layer_data *device_data = get_my_data_ptr(get_dispatch_key(commandBuffer), layer_data_map);
 
-    if (!PreCallValidateCmdCopyImageToBuffer(device_data, srcImage, regionCount, pRegions, "vkCmdCopyImageToBuffer()")) {
+    if (!PreCallValidateCmdCopyImageToBuffer(device_data, srcImage, dstBuffer, regionCount, pRegions, "vkCmdCopyImageToBuffer()")) {
         device_data->device_dispatch_table->CmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, dstBuffer, regionCount,
                                                                  pRegions);
     }
@@ -763,7 +823,30 @@ VKAPI_ATTR void VKAPI_CALL CmdCopyImageToBuffer(VkCommandBuffer commandBuffer, V
 
 static bool PreCallValidateCmdCopyBufferToImage(layer_data *dev_data, VkImage dstImage, uint32_t regionCount,
                                                 const VkBufferImageCopy *pRegions, const char *func_name) {
-    return ValidateBufferImageCopyData(dev_data, regionCount, pRegions, dstImage, "vkCmdCopyBufferToImage");
+    bool skip =  ValidateBufferImageCopyData(dev_data, regionCount, pRegions, dstImage, "vkCmdCopyBufferToImage");
+
+    auto image_info = getImageState(dev_data, dstImage);
+    for (uint32_t i = 0; i < regionCount; i++)
+    {
+        // The source region specified by a given element of regions must be a region that is contained within srcImage
+        if (ExceedsImageBounds(&pRegions[i].imageOffset, &pRegions[i].imageExtent, image_info)) {
+            skip |= log_msg(
+                dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                reinterpret_cast<uint64_t &>(dstImage), __LINE__, VALIDATION_ERROR_01228, "IMAGE",
+                "vkCmdCopyBufferToImage(): pRegion[%d] offset + extent exceeds the image size. %s.",
+                i, validation_error_map[VALIDATION_ERROR_01228]);
+        }
+
+        // The destination region specified by a given element of regions must be a region that is contained within dstBuffer
+        if (ExceedsBufferBounds(&pRegions[i], image_info)) {
+            skip |= log_msg(
+                dev_data->report_data, VK_DEBUG_REPORT_ERROR_BIT_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT,
+                reinterpret_cast<uint64_t &>(dstImage), __LINE__, VALIDATION_ERROR_01227, "IMAGE",
+                "vkCmdCopyBufferToImage(): pRegion[%d] offset + extent exceeds the buffer size. %s.",
+                i, validation_error_map[VALIDATION_ERROR_01227]);
+        }
+    }
+    return skip;
 }
 
 VKAPI_ATTR void VKAPI_CALL CmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
